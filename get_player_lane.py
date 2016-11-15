@@ -1,10 +1,16 @@
 # this script is to pick 5 top champions of the specific player from the master_clean dataset
+# compare the 5 champs with the 4 lists, derive the main lane of the player
 from collections import OrderedDict
+import json
+import argparse
+
 top_5_champs = []
+top_5_champ_names = []
 TOP =[14, 17, 23, 27, 36, 39, 41, 48, 54, 57, 58, 62, 68, 75, 78, 80, 82, 83, 85, 86, 92, 98, 114, 122, 126, 133, 150, 240, 266, 420]
 JUNGLE =[2, 5, 11, 19, 20, 24, 28, 32, 33, 35, 56, 59, 60, 64, 72, 76, 77, 79, 102, 104, 106, 107, 113, 120, 121, 154, 203, 254, 421, 427]
 BOTTOM =[12, 15, 16, 18, 21, 22, 25, 29, 37, 40, 43, 44, 51, 53, 67, 81, 89, 111, 117, 119, 143, 201, 202, 222, 223, 236, 267, 412, 429, 432]
 MIDDLE = [1, 3, 4, 6, 7, 8, 9, 10, 13, 26, 30, 31, 34, 38, 42, 45, 50, 55, 61, 63, 69, 74, 84, 90, 91, 96, 99, 101, 103, 105, 110, 112, 115, 127, 131, 134, 136, 157, 161, 163, 238, 245, 268]
+
 
 def get_lane_of_the_player():
 	top_points = 0
@@ -56,5 +62,24 @@ def get_top_5_champs(playerID):
 		index += 1
 	print top_5_champs
 
-get_top_5_champs('102657')
-get_lane_of_the_player()
+def get_champion_names():
+	file = open('champions.json', 'r')
+	data = json.load(file)
+	for champ in top_5_champs:
+		top_5_champ_names.append(data.get(str(champ[0])))
+	string = 'The player plays is most familiar with these five champions: '
+	for name in top_5_champ_names:
+		string += name
+		string += ', '
+	string = string[:-2]
+	print string
+
+if __name__ == '__main__':
+
+	parser = argparse.ArgumentParser()
+	parser.add_argument('playerID', help='the ID of the player for suggestions')
+	args = parser.parse_args()
+	playerID = args.playerID
+	get_top_5_champs(playerID)
+	get_champion_names()
+	get_lane_of_the_player()
