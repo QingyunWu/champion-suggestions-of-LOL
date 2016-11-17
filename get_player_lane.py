@@ -5,15 +5,16 @@ import json
 import argparse
 import random
 
+# list of tuples(champID, mastery)
 top_5_champs = []
 top_5_champ_names = []
+
 # hadoop to get average win_rate and champ_points for every champ ID
 win_rates = {}
 champ_points = {}
 
-
 champion_names = {}
-
+player_champ_points = {}
 top_win_rates = {}
 mid_win_rates = {}
 bot_win_rates = {}
@@ -29,11 +30,12 @@ BOTTOM =[12, 15, 16, 18, 21, 22, 25, 29, 37, 40, 43, 44, 51, 53, 67, 81, 89, 111
 MIDDLE = [1, 3, 4, 6, 7, 8, 9, 10, 13, 26, 30, 31, 34, 38, 42, 45, 50, 55, 61, 63, 69, 74, 84, 90, 91, 96, 99, 101, 103, 105, 110, 112, 115, 127, 131, 134, 136, 157, 161, 163, 238, 245, 268]
 
 
-
+# random generate winrate and champ points for every champ
 def generate_win_rates():
 	with open('champions.json','r') as file:
 		champions_data = json.load(file)
 		for key in champions_data.keys():
+			hehe = 4
 			# create a float between 0.4 - 0.6
 			win_rates[(int)(key)] = random.uniform(0.4, 0.6)
 			champ_points[(int)(key)] = (int)(random.uniform(4000, 8000))
@@ -81,6 +83,8 @@ def get_top_5_champs(playerID):
 	dic = {}
 	for s in champions_list_of_player:
 		dic[(int)(s.split(',')[0])] = (int)(s.split(',')[1])
+		# insert key-value into player_champ_points
+		player_champ_points[(int)(s.split(',')[0])] = (int)(s.split(',')[1])
 
 	d_sorted_by_value = OrderedDict(reversed(sorted(dic.items(), key=lambda x: x[1])))
 	index = 0
@@ -94,20 +98,26 @@ def get_champion_names():
 	title = open('champions_title.json', 'r')
 	title_data = json.load(title)
 	name_data = json.load(name)
-	# fill the champ_names list
+	# fill the champ_names list and player_champ_points
 	for champ in name_data.keys():
 		champion_names[(int)(champ)] = name_data.get(champ)
+		if (int)(champ) in player_champ_points:
+			continue
+		else:
+			player_champ_points[(int)(champ)] = 0
 	for champ in top_5_champs:
 		top_5_champ_names.append(name_data.get(str(champ[0])))
 	string = 'You are most familiar with these five champions: \n'
 	for champ_name in top_5_champ_names:
 		string += champ_name + ': ' + title_data.get(champ_name).get('title') + ',\n'
 	string = string[:-2]
+	
+
 	name.close()
 	title.close()
 	print string +'\n'
 
-def get_data_for_every_lane():
+def get_winrate_for_every_lane():
 	for champ in win_rates.keys():
 		if champ in TOP:
 			top_win_rates[champ] = win_rates[champ]
@@ -134,7 +144,7 @@ def make_suggestions(lane):
 		if index < 10:
 			top_10_win_rate_champs[x] = sorted_by_value[x]
 			index += 1
-	# we have top 10 win rate champ for that lane, get three lowest champion points
+	# we have top 10 win rate champ for that lane, get three with lowest champion mastery points
 	# hadoop to get the average champion points for every champ
 	champ_points_of_10 = {}
 	for x in top_10_win_rate_champs.keys():
@@ -143,12 +153,16 @@ def make_suggestions(lane):
 	index2 = 0
 	for key,value in ordered_champ_points_of_10.items():
 		if index2 < 3:
+			# pass the champions the player already good at
+			if key in top_5_champs[0]:
+				continue
 			champ_selct_suggestions[key] = value
 			index2 += 1
 	# now we have three recommended champs
 	string = 'The recommended champions for you are: \n'
 	for champ in champ_selct_suggestions.keys():
-		string += (str)(champion_names[champ]) + ", winrate: " + (str)((int)(win_rates[champ] * 100)) + '%\n'
+		string += (str)(champion_names[champ]) + ", average winrate: " +(str)((int)(win_rates[champ] * 100)) + "%, "\
+		"your current champion mastery is: " + str(player_champ_points[champ]) + '\n'
 	print string
 
 
@@ -160,8 +174,7 @@ if __name__ == '__main__':
 	args = parser.parse_args()
 	playerID = args.playerID
 	generate_win_rates()
-	get_data_for_every_lane()
-
+	get_winrate_for_every_lane()
 	get_top_5_champs(playerID)
 	get_champion_names()
 	generate_win_rates
