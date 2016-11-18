@@ -1,9 +1,8 @@
-from flask import render_template, request, redirect
-import flask
+from flask import render_template, request, Flask
 import time
 import urllib2
 
-app = flask.Flask(__name__, static_url_path='/static/')
+app = Flask(__name__, static_url_path='/static/')
 # this script is to pick 5 top champions of the specific player from the master_clean dataset
 # compare the 5 champs with the 4 lists, derive the main lane of the player
 from collections import OrderedDict
@@ -17,9 +16,9 @@ top_5_champ_names = []
 
 # hadoop to get average win_rate and champ_points for every champ ID
 win_rates = {}
+aram_win_rates = {}
 champ_points = {}
-print_string1 = ''
-print_string2 = ''
+champ_name_to_id = {}
 champion_names = {}
 player_champ_points = {}
 top_win_rates = {}
@@ -27,9 +26,17 @@ mid_win_rates = {}
 bot_win_rates = {}
 jug_win_rates = {}
 sup_win_rates = {}
+aram_top_win_rates = {}
+aram_mid_win_rates = {}
+aram_bot_win_rates = {}
+aram_jug_win_rates = {}
+aram_sup_win_rates = {}
 
+# top 10 for that lane
 top_10_win_rate_champs = {}
-champ_selct_suggestions = {}
+aram_top_10_win_rate_champs = {}
+champ_select_suggestions = {}
+aram_champ_select_suggestions = {}
 
 
 TOP =[14, 17, 23, 27, 36, 39, 41, 48, 54, 57, 58, 62, 68, 75, 78, 80, 82, 83, 85, 86, 92, 98, 114, 122, 126, 133, 150, 240, 266, 420]
@@ -39,14 +46,55 @@ MIDDLE = [1, 3, 4, 6, 7, 8, 9, 10, 13, 26, 30, 31, 34, 38, 42, 45, 50, 55, 61, 6
 SUPPORT = [12, 16, 25, 37, 40, 43, 44, 53, 89, 111, 117, 143, 201, 223, 267, 412, 432]
 
 # random generate winrate and champ points for every champ
-def generate_win_rates():
-    with open('champions.json','r') as file:
-        champions_data = json.load(file)
-        for key in champions_data.keys():
-            hehe = 4
-            # create a float between 0.4 - 0.6
-            win_rates[(int)(key)] = random.uniform(0.4, 0.6)
-            champ_points[(int)(key)] = (int)(random.uniform(4000, 8000))
+# def generate_win_rates():
+#     global win_rates
+#     with open('champions.json','r') as file:
+#         champions_data = json.load(file)
+#         for key in champions_data.keys():
+#             # create a float between 0.4 - 0.6
+#             win_rates[(int)(key)] = random.uniform(0.4, 0.6)
+
+# this kind of data only loads once            
+def load_data():
+    with open('champions_title.json', 'r') as title_file:
+        title_data = json.load(title_file)
+        for name in title_data.keys():
+            champ_name_to_id[name] = title_data[name]['id']
+    with open('average_champion_mastery.txt', 'r') as file:
+        while 1:
+            line = file.readline()
+            if not line:
+                break
+            champ_points[(int)(line.split("\t")[0])] = (int)(line.split("\t")[1])
+    with open('rank_winrates.txt', 'r') as rank_winrates:
+        while 1:
+            line = rank_winrates.readline()
+            if not line:
+                break
+            win_rates[champ_name_to_id.get(line.split()[0])] = (float)(line.split()[1]) / 100.0
+    with open('aram_winrates.txt', 'r') as aram_winrates:
+        while 1:
+            line = aram_winrates.readline()
+            if not line:
+                break
+            aram_win_rates[champ_name_to_id[(line.split()[0])]] = (float)(line.split()[1]) / 100.0
+    # get win rate for every lane, both game modes
+    for champ in win_rates.keys():
+        if champ in TOP:
+            top_win_rates[champ] = win_rates[champ]
+            aram_top_win_rates[champ] = aram_win_rates[champ]
+        elif champ in JUNGLE:
+            jug_win_rates[champ] = win_rates[champ]
+            aram_jug_win_rates[champ] = aram_win_rates[champ]
+        elif champ in MIDDLE:
+            mid_win_rates[champ] = win_rates[champ]
+            aram_mid_win_rates[champ] = aram_win_rates[champ]
+        elif champ in BOTTOM:
+            bot_win_rates[champ] = win_rates[champ]
+            aram_bot_win_rates[champ] = aram_win_rates[champ]
+        elif champ in SUPPORT:
+            sup_win_rates[champ] = win_rates[champ]
+            aram_sup_win_rates[champ] = aram_win_rates[champ]
 
 # call the API to get the player_name
 def get_player_name(playerID):
@@ -60,7 +108,7 @@ def get_player_name(playerID):
             name = content[str(playerID)]["name"]
             return name
     except:
-        return 'StupidBady'
+        return 'StupidYou'
 
 def get_lane_of_the_player():
     top_points = 0
@@ -81,54 +129,45 @@ def get_lane_of_the_player():
             sup_points += x[1]
     max_pints = 0
     max_points = max(top_points, jug_points, bot_points, mid_points, sup_points)
-    global print_string2
-    string = 'From our analysis, you are a '
-    print_string2 += string
+
     if mid_points == max_points:
-        print string + "MIDDLE player!"
-        print_string2 += "MIDDLE player!\n\n"
-        return "mid"
+        return "middle lane"
     elif top_points == max_points:
-        print string + "TOP player!"
-        print_string2 += "TOP player!\n\n"
-        return "top"
+        return "top lane"
     elif bot_points == max_points:
-        print string + "BOTTOM player!"
-        print_string2 += "BOTTOM player!\n\n"
-        return "bot"
+        return "bottom lane"
     elif jug_points == max_points:
-        print string + "JUNGLE player!"
-        print_string2 += "JUNGLE player!\n\n"
-        return "jug"
+        return "jungle lane"
     elif sup_points == max_points:
-        print string + "SUPPORT player"
-        print_string2 += "SUPPORT player!\n\n"
-        return "sup"
+        return "support"
 
 def get_top_5_champs(playerID):
-    file = open('mastery_clean.txt', 'r')
-    champions_list_of_player = []
-    while 1:
-        line = file.readline()
-        if not line:
-            break
-        if line.split("\t")[0] == playerID:
-            champions_list_of_player.append(line.split("\t")[1])
-    file.close()
-    dic = {}
-    for s in champions_list_of_player:
-        dic[(int)(s.split(',')[0])] = (int)(s.split(',')[1])
-        # insert key-value into player_champ_points
-        player_champ_points[(int)(s.split(',')[0])] = (int)(s.split(',')[1])
+    with open('mastery_clean.txt', 'r') as file:
+        file = open('mastery_clean.txt', 'r')
+        champions_list_of_player = []
+        while 1:
+            line = file.readline()
+            if not line:
+                break
+            if line.split("\t")[0] == str(playerID):
+                champions_list_of_player.append(line.split("\t")[1])
+        file.close()
+        dic = {}
+        for s in champions_list_of_player:
+            dic[(int)(s.split(',')[0])] = (int)(s.split(',')[1])
+            # insert key-value into player_champ_points
+            player_champ_points[(int)(s.split(',')[0])] = (int)(s.split(',')[1])
 
-    d_sorted_by_value = OrderedDict(reversed(sorted(dic.items(), key=lambda x: x[1])))
-    index = 0
-    for x in d_sorted_by_value.items():
-        if index < 5:
-            top_5_champs.append(x)
-        index += 1
+        d_sorted_by_value = OrderedDict(reversed(sorted(dic.items(), key=lambda x: x[1])))
+        index = 0
+        for x in d_sorted_by_value.items():
+            if index < 5:
+                top_5_champs.append(x)
+            index += 1
 
+# most familiar 5 champs
 def get_champion_names():
+    lis = []
     name = open('champions.json', 'r')
     title = open('champions_title.json', 'r')
     title_data = json.load(title)
@@ -141,50 +180,63 @@ def get_champion_names():
         else:
             player_champ_points[(int)(champ)] = 0
     for champ in top_5_champs:
+        champID = champ[0]
+        champName = name_data.get(str(champID))
+        lis.append(champName)
+        champ_title = title_data.get(champName).get('title')
+        lis.append(champ_title)
+        lis.append(player_champ_points[(int)(champID)])
         top_5_champ_names.append(name_data.get(str(champ[0])))
     string = 'You are most familiar with these five champions: \n'
-    global print_string1
     for champ_name in top_5_champ_names:
         string += champ_name + ': ' + title_data.get(champ_name).get('title') + '\n'
-    # string = string[:-2]
-    
-
     name.close()
     title.close()
-    print_string1 += string
     print string +'\n'
+    return lis
 
-def get_winrate_for_every_lane():
-    for champ in win_rates.keys():
-        if champ in TOP:
-            top_win_rates[champ] = win_rates[champ]
-        elif champ in JUNGLE:
-            jug_win_rates[champ] = win_rates[champ]
-        elif champ in MIDDLE:
-            mid_win_rates[champ] = win_rates[champ]
-        elif champ in BOTTOM:
-            bot_win_rates[champ] = win_rates[champ]
-        elif champ in SUPPORT:
-            sup_win_rates[champ] = win_rates[champ]
+# def get_winrate_for_every_lane():
+#     for champ in win_rates.keys():
+#         if champ in TOP:
+#             top_win_rates[champ] = win_rates[champ]
+#         elif champ in JUNGLE:
+#             jug_win_rates[champ] = win_rates[champ]
+#         elif champ in MIDDLE:
+#             mid_win_rates[champ] = win_rates[champ]
+#         elif champ in BOTTOM:
+#             bot_win_rates[champ] = win_rates[champ]
+#         elif champ in SUPPORT:
+#             sup_win_rates[champ] = win_rates[champ]
 
 def make_suggestions(lane):
+    lis = []
+    aram_lis = []
     sorted_by_value = {}
-    if lane == 'mid':
+    sorted_by_value_a = {}
+    if lane == 'middle lane':
         sorted_by_value = OrderedDict(reversed(sorted(mid_win_rates.items(), key=lambda x: x[1])))
-    elif lane == 'bot':
+        sorted_by_value_a = OrderedDict(reversed(sorted(aram_mid_win_rates.items(), key=lambda x: x[1])))
+    elif lane == 'bottom lane':
         sorted_by_value = OrderedDict(reversed(sorted(bot_win_rates.items(), key=lambda x: x[1])))
-    elif lane == 'top':
+        sorted_by_value_a = OrderedDict(reversed(sorted(aram_bot_win_rates.items(), key=lambda x: x[1])))
+    elif lane == 'top lane':
         sorted_by_value = OrderedDict(reversed(sorted(top_win_rates.items(), key=lambda x: x[1])))
-    elif lane == 'jug':
+        sorted_by_value_a = OrderedDict(reversed(sorted(aram_top_win_rates.items(), key=lambda x: x[1])))
+    elif lane == 'jungle lane':
         sorted_by_value = OrderedDict(reversed(sorted(jug_win_rates.items(), key=lambda x: x[1])))
-    elif lane == 'sup':
+        sorted_by_value_a = OrderedDict(reversed(sorted(aram_jug_win_rates.items(), key=lambda x: x[1])))
+    elif lane == 'support':
         sorted_by_value = OrderedDict(reversed(sorted(sup_win_rates.items(), key=lambda x: x[1])))
-
-
-    index  = 0
+        sorted_by_value_a = OrderedDict(reversed(sorted(aram_sup_win_rates.items(), key=lambda x: x[1])))
+    index = 0
     for x in sorted_by_value.keys():
         if index < 10:
             top_10_win_rate_champs[x] = sorted_by_value[x]
+            index += 1
+    index = 0
+    for x in sorted_by_value_a.keys():
+        if index < 10:
+            aram_top_10_win_rate_champs[x] = sorted_by_value_a[x]
             index += 1
     # we have top 10 win rate champ for that lane, get three with lowest champion mastery points
     # hadoop to get the average champion points for every champ
@@ -192,80 +244,89 @@ def make_suggestions(lane):
     for x in top_10_win_rate_champs.keys():
         champ_points_of_10[x] = champ_points[x]
     ordered_champ_points_of_10 = OrderedDict(sorted(champ_points_of_10.items(), key=lambda x: x[1]))
-    index2 = 0
+    index = 0
     top_5_champ_id = []
     for x in top_5_champs:
         top_5_champ_id.append(x[0])
     for key,value in ordered_champ_points_of_10.items():
-        if index2 < 3:
+        if index < 3:
             # pass the champions the player already good at
             if key in top_5_champ_id:
                 continue
-            champ_selct_suggestions[key] = value
-            index2 += 1
+            champ_select_suggestions[key] = value
+            index += 1
+
+    champ_points_of_10 = {}
+    for x in aram_top_10_win_rate_champs.keys():
+        champ_points_of_10[x] = champ_points[x]
+    aram_ordered_champ_points_of_10 = OrderedDict(sorted(champ_points_of_10.items(), key=lambda x: x[1]))
+    index = 0
+    for key,value in aram_ordered_champ_points_of_10.items():
+        if index < 3:
+            if key in top_5_champ_id:
+                continue
+            if key in champ_select_suggestions.keys():
+                continue
+            aram_champ_select_suggestions[key] = value
+            index += 1
+
     # now we have three recommended champs
     string = 'The recommended champions for you are: \n'
-    for champ in champ_selct_suggestions.keys():
-        string += (str)(champion_names[champ]) + ", average winrate: " +(str)((int)(win_rates[champ] * 100)) + "%, "\
+    for champ in champ_select_suggestions.keys():
+        lis.append(str(champion_names[champ]))
+        lis.append((str)((round)(win_rates[champ] * 100, 1)) + "%")
+        lis.append(str(player_champ_points[champ]))
+        string += (str)(champion_names[champ]) + ", average winrate: " +(str)((round)(win_rates[champ] * 100, 1)) + "%, "\
         "your current champion mastery is: " + str(player_champ_points[champ]) + '\n'
     string += "Give a shot!"
-    global print_string2
-    print_string2 += (string + '\n')
+    for champ in aram_champ_select_suggestions.keys():
+        aram_lis.append(str(champion_names[champ]))
+        aram_lis.append((str)((round)(aram_win_rates[champ] * 100, 1)) + "%")
+        aram_lis.append(str(player_champ_points[champ]))
     print string
+    return (lis, aram_lis)
     
-
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('playerID', help='the ID of the player for suggestions')
-    args = parser.parse_args()
-    playerID = str(args.playerID)
-    player_name = get_player_name(playerID)
-    generate_win_rates()
-    get_winrate_for_every_lane()
-    get_top_5_champs(playerID)
-    get_champion_names()
-    generate_win_rates
-    lane = get_lane_of_the_player()
-    make_suggestions(lane)
-
 @app.route('/index')
 def index():
-        # for x in top_5_champ_names:
-        #     time.sleep(1)
-        #     yield '%s<br/>\n' % x
-    champs = []
-    champs = champ_selct_suggestions.keys()
-    return render_template('index.html',print_string1=print_string1, print_string2=print_string2, player_name=player_name, champ1=champs[0], champ2=champs[1], champ3=champs[2])
-    # return flask.Response(inner(), mimetype='text/html')  # text/html is required for most browsers to show the partial page immediately
+    load_data()
+    return render_template('base.html')
 
-@app.route('/search', methods = ['POST'])
-def search():
+@app.route('/result', methods = ['POST'])
+def show_result():
     if request.form.get('Search',None) == 'Search':
-        global top_5_champ_names
-        global champ_selct_suggestions
-        global top_5_champs
-        global print_string1
-        global print_string2
-        global top_10_win_rate_champs
-        global win_rates
-        global champ_points
-        win_rates = {}
-        champ_points = {}
-        generate_win_rates()
-        top_10_win_rate_champs = {}
-        print_string1 = ''
-        print_string2 = ''
-        top_5_champs = []
-        top_5_champ_names = []
-        champ_selct_suggestions = {}
-        playerID = request.form.get('playerID')
-        player_name = get_player_name(playerID)
-        get_top_5_champs(playerID)
-        get_champion_names()
-        lane = get_lane_of_the_player()
-        make_suggestions(lane)
-        champs = champ_selct_suggestions.keys()
-        return render_template('index.html',print_string1=print_string1, print_string2=print_string2, player_name=player_name, champ1=champs[0], champ2=champs[1], champ3=champs[2])
-app.run(debug=True,port=5080)
+        # make these global, so we can change the value everywhere
+        try:
+            global top_5_champ_names
+            global champ_select_suggestions
+            global top_5_champs
+            global top_10_win_rate_champs
+            global aram_champ_select_suggestions
+            global aram_top_10_win_rate_champs
+            top_10_win_rate_champs = {}
+            aram_top_10_win_rate_champs = {}
+            top_5_champs = []
+            top_5_champ_names = []
+            champ_select_suggestions = {}
+            aram_champ_select_suggestions = {}
+
+            # generate_win_rates()
+            load_data()
+            # get_winrate_for_every_lane()
+            playerID = request.form.get('playerID')
+            player_name = get_player_name(playerID)
+            get_top_5_champs(playerID)
+            top_5_list = get_champion_names()
+            lane = get_lane_of_the_player()
+            lis, aram_lis = make_suggestions(lane)
+            champs = champ_select_suggestions.keys()
+            aram_champs = aram_champ_select_suggestions.keys()
+            player_name_list = player_name.split()
+            name_with_space = ''
+            for x in player_name_list:
+                name_with_space += (x + '+')
+            name_with_space = name_with_space[:-1]
+            return render_template('index.html', player_name=player_name, name_with_space=name_with_space, champs=champs,aram_champs=aram_champs, lane=lane,lis=lis, aram_lis = aram_lis,top_5_list=top_5_list)
+        except:
+            return "not valid ID!"
+if __name__ == '__main__':
+    app.run(debug=True,port=5080)
