@@ -1,0 +1,17 @@
+body {
+    background-color: lightblue;
+    padding-top: 70px;
+}
+
+
+
+h1 {
+    color: white;
+    text-align: center;
+    font-size: Georgia;
+}
+
+p {
+    font-family: verdana;
+    font-size: 75%;
+}

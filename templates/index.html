@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>League of Legends</title>
+
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='mystyle.css') }}">
+    <script src="http://code.jquery.com/jquery-2.2.0.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+
+</head>
+<body>
+<form id="chat" action="/search" method="post">
+                        <span class="label">Player ID</span>
+                        <span class="glyphicon glyphicon-user"></span>
+                        <input type="text" name="playerID" placeholder="digit ID"></input>
+  						<input type="submit" name="Search" value="Search" class="btn btn-success"></input>
+</form>
+
+
+<h1 > Hello! {{player_name}} </h1>
+<p>
+{% for line in print_string1.splitlines() %}
+    {{line}}<br>
+{% endfor %}
+
+<br>
+{% for line in print_string2.splitlines() %}
+    {{line}}<br>
+{% endfor %}
+</p>
+<img src="{{ url_for('static', filename = 'images/%s.jpg' %champ1) }}" width="405" height="239" class="img-rounded" alt="previous" title="1" border="2">
+<img src="{{ url_for('static', filename = 'images/%s.jpg' %champ2) }}" width="405" height="239" class="img-rounded" alt="previous" title="2" border="2">
+<img src="{{ url_for('static', filename = 'images/%s.jpg' %champ3) }}" width="405" height="239" class="img-rounded" alt="previous" title="2" border="2">
+
+</body>
+</html>
