@@ -1,7 +1,7 @@
 from flask import render_template, request, Flask
 import time
 import urllib2
-
+import traceback
 app = Flask(__name__, static_url_path='/static/')
 # this script is to pick 5 top champions of the specific player from the master_clean dataset
 # compare the 5 champs with the 4 lists, derive the main lane of the player
@@ -97,18 +97,31 @@ def load_data():
             aram_sup_win_rates[champ] = aram_win_rates[champ]
 
 # call the API to get the player_name
-def get_player_name(playerID):
-    url = "https://na.api.pvp.net/api/lol/na/v1.4/summoner/{}?api_key=RGAPI-bed8d7c5-334d-40b5-8807-5fa186553d2c".format((str)(playerID))
+# def get_player_name(playerID):
+#     url = "https://na.api.pvp.net/api/lol/na/v1.4/summoner/{}?api_key=RGAPI-bed8d7c5-334d-40b5-8807-5fa186553d2c".format((str)(playerID))
+#     try:
+#         data = urllib2.urlopen(url, timeout=12)
+#         statusCode = data.getcode()
+#         if statusCode == 200:
+#             page = data.read()
+#             content = json.loads(page)
+#             name = content[str(playerID)]["name"]
+#             return name
+#     except:
+#         return 'StupidYou'
+
+def get_player_id(playerName):
+    url = "https://na.api.pvp.net/api/lol/na/v1.4/summoner/by-name/{}?api_key=RGAPI-bed8d7c5-334d-40b5-8807-5fa186553d2c".format(playerName)
     try:
         data = urllib2.urlopen(url, timeout=12)
         statusCode = data.getcode()
         if statusCode == 200:
             page = data.read()
             content = json.loads(page)
-            name = content[str(playerID)]["name"]
-            return name
+            id = content[playerName.lower()]["id"]
+            return id
     except:
-        return 'StupidYou'
+        return 'Wrong name!'
 
 def get_lane_of_the_player():
     top_points = 0
@@ -141,29 +154,49 @@ def get_lane_of_the_player():
     elif sup_points == max_points:
         return "support"
 
-def get_top_5_champs(playerID):
-    with open('mastery_clean.txt', 'r') as file:
-        file = open('mastery_clean.txt', 'r')
-        champions_list_of_player = []
-        while 1:
-            line = file.readline()
-            if not line:
-                break
-            if line.split("\t")[0] == str(playerID):
-                champions_list_of_player.append(line.split("\t")[1])
-        file.close()
-        dic = {}
-        for s in champions_list_of_player:
-            dic[(int)(s.split(',')[0])] = (int)(s.split(',')[1])
-            # insert key-value into player_champ_points
-            player_champ_points[(int)(s.split(',')[0])] = (int)(s.split(',')[1])
+# def get_top_5_champs(playerID):
+#     with open('mastery_clean.txt', 'r') as file:
+#         file = open('mastery_clean.txt', 'r')
+#         champions_list_of_player = []
+#         while 1:
+#             line = file.readline()
+#             if not line:
+#                 break
+#             if line.split("\t")[0] == str(playerID):
+#                 champions_list_of_player.append(line.split("\t")[1])
+#         file.close()
+#         dic = {}
+#         for s in champions_list_of_player:
+#             dic[(int)(s.split(',')[0])] = (int)(s.split(',')[1])
+#             # insert key-value into player_champ_points
+#             player_champ_points[(int)(s.split(',')[0])] = (int)(s.split(',')[1])
 
-        d_sorted_by_value = OrderedDict(reversed(sorted(dic.items(), key=lambda x: x[1])))
-        index = 0
-        for x in d_sorted_by_value.items():
-            if index < 5:
-                top_5_champs.append(x)
-            index += 1
+#         d_sorted_by_value = OrderedDict(reversed(sorted(dic.items(), key=lambda x: x[1])))
+#         index = 0
+#         for x in d_sorted_by_value.items():
+#             if index < 5:
+#                 top_5_champs.append(x)
+#             index += 1
+
+def get_top_5_champs(playerID):
+    url = "https://na.api.pvp.net/championmastery/location/NA1/player/{}/champions?api_key=RGAPI-947ba119-a421-421d-9f9c-3699d5bb938e".format(playerID)
+    try:
+        data = urllib2.urlopen(url, timeout=12)
+        statusCode = data.getcode()
+        if statusCode == 200:
+            page = data.read()
+            content = json.loads(page)
+            for dic in content:
+                player_champ_points[dic['championId']] = dic['championPoints']
+    except:
+        return 'StupidYou'
+    sorted_by_value = OrderedDict(reversed(sorted(player_champ_points.items(), key=lambda x: x[1])))
+    index = 0
+    for x in sorted_by_value.items():
+        if index < 5:
+            top_5_champs.append(x)
+        index += 1
+
 
 # most familiar 5 champs
 def get_champion_names():
@@ -302,6 +335,8 @@ def show_result():
             global top_10_win_rate_champs
             global aram_champ_select_suggestions
             global aram_top_10_win_rate_champs
+            global player_champ_points
+            player_champ_points = {}
             top_10_win_rate_champs = {}
             aram_top_10_win_rate_champs = {}
             top_5_champs = []
@@ -312,21 +347,22 @@ def show_result():
             # generate_win_rates()
             load_data()
             # get_winrate_for_every_lane()
-            playerID = request.form.get('playerID')
-            player_name = get_player_name(playerID)
+            playerName = request.form.get('playerName')
+            # player_name = get_player_name(playerID)
+            playerID = get_player_id(playerName)
             get_top_5_champs(playerID)
             top_5_list = get_champion_names()
             lane = get_lane_of_the_player()
             lis, aram_lis = make_suggestions(lane)
             champs = champ_select_suggestions.keys()
             aram_champs = aram_champ_select_suggestions.keys()
-            player_name_list = player_name.split()
+            player_name_list = playerName.split()
             name_with_space = ''
             for x in player_name_list:
                 name_with_space += (x + '+')
             name_with_space = name_with_space[:-1]
-            return render_template('index.html', player_name=player_name, name_with_space=name_with_space, champs=champs,aram_champs=aram_champs, lane=lane,lis=lis, aram_lis = aram_lis,top_5_list=top_5_list)
+            return render_template('index.html', player_name=playerName, name_with_space=name_with_space, champs=champs,aram_champs=aram_champs, lane=lane,lis=lis, aram_lis = aram_lis,top_5_list=top_5_list)
         except:
-            return "not valid ID!"
+            traceback.print_exc()
 if __name__ == '__main__':
     app.run(debug=True,port=5080)
